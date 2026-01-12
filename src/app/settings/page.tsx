@@ -34,6 +34,8 @@ import {
   Trash2,
   Plus,
   Save,
+  Lock,
+  Loader2,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { Profile, Category } from "@/types/database";
@@ -79,6 +81,12 @@ export default function SettingsPage() {
     settings?.auto_archive_days || 2
   );
   const [saving, setSaving] = useState(false);
+
+  // Estados para cambio de contraseña
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const handleCreateProfile = async () => {
     if (!newProfileName.trim() || !user) return;
@@ -199,6 +207,44 @@ export default function SettingsPage() {
       return;
     }
     toast.error("Función no implementada. Contacta con soporte para eliminar tu cuenta.");
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword || !confirmNewPassword) {
+      toast.error("Por favor, completa todos los campos");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      toast.error("Las contraseñas no coinciden");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+
+    setChangingPassword(true);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success("Contraseña actualizada correctamente");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmNewPassword("");
+      }
+    } catch {
+      toast.error("Error al cambiar la contraseña");
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   return (
@@ -473,6 +519,45 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label>Email</Label>
                   <p className="text-sm text-muted-foreground">{user?.email}</p>
+                </div>
+
+                <Separator />
+
+                {/* Cambiar contraseña */}
+                <div className="space-y-3">
+                  <Label>Cambiar contraseña</Label>
+                  <div className="space-y-3 max-w-sm">
+                    <Input
+                      type="password"
+                      placeholder="Nueva contraseña"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      disabled={changingPassword}
+                    />
+                    <Input
+                      type="password"
+                      placeholder="Confirmar nueva contraseña"
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      disabled={changingPassword}
+                    />
+                    <Button
+                      onClick={handleChangePassword}
+                      disabled={changingPassword || !newPassword || !confirmNewPassword}
+                    >
+                      {changingPassword ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Cambiando...
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="h-4 w-4 mr-2" />
+                          Cambiar contraseña
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
 
                 <Separator />
