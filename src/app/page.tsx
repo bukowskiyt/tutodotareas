@@ -68,7 +68,8 @@ export default async function HomePage() {
         .select(`
           *,
           category:categories(*),
-          subtasks:tasks(*)
+          subtasks:tasks(*),
+          comments:task_comments(*)
         `)
         .eq("profile_id", currentProfile.id)
         .is("parent_task_id", null)
