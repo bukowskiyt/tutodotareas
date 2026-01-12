@@ -40,7 +40,7 @@ export default async function HomePage() {
         user_id: user.id,
         name: "Principal",
         order: 0,
-      })
+      } as never)
       .select()
       .single();
 
