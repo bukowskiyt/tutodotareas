@@ -56,8 +56,10 @@ export default async function HomePage() {
   const currentProfile = profiles.find((p) => p.id === currentProfileId) || profiles[0];
 
   // Obtener tareas y categorías del perfil activo
-  let tasks: unknown[] = [];
-  let categories: unknown[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let tasks: any[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let categories: any[] = [];
 
   if (currentProfile) {
     const [tasksResult, categoriesResult] = await Promise.all([
