@@ -23,19 +23,31 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [hasSession, setHasSession] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
-    // Verificar si hay una sesión válida de recuperación
+    // Escuchar eventos de autenticación (incluyendo PASSWORD_RECOVERY)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
+        setHasSession(true);
+        setChecking(false);
+      }
+    });
+
+    // También verificar sesión existente
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setError("El enlace de recuperación ha expirado o es inválido. Por favor, solicita uno nuevo.");
+      if (session) {
+        setHasSession(true);
       }
+      setChecking(false);
     };
     checkSession();
+
+    return () => subscription.unsubscribe();
   }, [supabase.auth]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,7 +89,25 @@ export default function ResetPasswordPage() {
     }
   };
 
-  if (error) {
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-foreground">TuTodoTareas</h1>
+          </div>
+          <Card>
+            <CardHeader className="text-center">
+              <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+              <CardTitle>Verificando...</CardTitle>
+            </CardHeader>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="w-full max-w-md">
@@ -87,7 +117,9 @@ export default function ResetPasswordPage() {
           <Card>
             <CardHeader className="text-center">
               <CardTitle className="text-destructive">Enlace inválido</CardTitle>
-              <CardDescription>{error}</CardDescription>
+              <CardDescription>
+                El enlace de recuperación ha expirado o es inválido. Por favor, solicita uno nuevo.
+              </CardDescription>
             </CardHeader>
             <CardFooter className="flex justify-center">
               <Link href="/auth/forgot-password">
