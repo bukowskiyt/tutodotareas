@@ -29,8 +29,10 @@ export default async function HomePage() {
       .single(),
   ]);
 
-  const profiles = profilesResult.data || [];
-  const settings = settingsResult.data;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const profiles: any[] = profilesResult.data || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const settings: any = settingsResult.data;
 
   // Si no hay perfiles, crear uno por defecto
   if (profiles.length === 0) {
