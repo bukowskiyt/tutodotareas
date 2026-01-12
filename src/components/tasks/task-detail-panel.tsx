@@ -50,7 +50,18 @@ import {
   Plus,
   Loader2,
   Check,
+  MoreHorizontal,
+  Pencil,
+  ChevronDown,
+  ChevronUp,
+  X,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Popover,
   PopoverContent,
@@ -84,6 +95,12 @@ export function TaskDetailPanel({ task, categories }: TaskDetailPanelProps) {
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [sendingComment, setSendingComment] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Estados para editar/eliminar comentarios
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentContent, setEditingCommentContent] = useState("");
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
 
   // Estado para crear nueva categoría
   const [showNewCategory, setShowNewCategory] = useState(false);
@@ -282,6 +299,69 @@ export function TaskDetailPanel({ task, categories }: TaskDetailPanelProps) {
 
     setSendingComment(false);
   };
+
+  // Funciones para editar comentarios
+  const startEditComment = (comment: { id: string; content: string }) => {
+    setEditingCommentId(comment.id);
+    setEditingCommentContent(comment.content);
+  };
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditingCommentContent("");
+  };
+
+  const saveEditComment = async () => {
+    if (!editingCommentId || !editingCommentContent.trim()) return;
+
+    const { error } = await supabase
+      .from("task_comments")
+      .update({ content: editingCommentContent.trim() })
+      .eq("id", editingCommentId);
+
+    if (error) {
+      toast.error("Error al editar comentario");
+    } else {
+      const updatedComments = task.comments?.map((c) =>
+        c.id === editingCommentId ? { ...c, content: editingCommentContent.trim() } : c
+      );
+      updateTask({ ...task, comments: updatedComments });
+      toast.success("Comentario actualizado");
+      cancelEditComment();
+    }
+  };
+
+  // Función para eliminar comentario
+  const deleteComment = async (commentId: string) => {
+    const { error } = await supabase
+      .from("task_comments")
+      .delete()
+      .eq("id", commentId);
+
+    if (error) {
+      toast.error("Error al eliminar comentario");
+    } else {
+      const updatedComments = task.comments?.filter((c) => c.id !== commentId);
+      updateTask({ ...task, comments: updatedComments });
+      toast.success("Comentario eliminado");
+      setDeletingCommentId(null);
+    }
+  };
+
+  // Función para expandir/colapsar comentario
+  const toggleExpandComment = (commentId: string) => {
+    setExpandedComments((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(commentId)) {
+        newSet.delete(commentId);
+      } else {
+        newSet.add(commentId);
+      }
+      return newSet;
+    });
+  };
+
+  const COMMENT_PREVIEW_LENGTH = 200;
 
   return (
     <Dialog open onOpenChange={() => setSelectedTaskId(null)}>
@@ -541,17 +621,129 @@ export function TaskDetailPanel({ task, categories }: TaskDetailPanelProps) {
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-3">
                 {task.comments && task.comments.length > 0 ? (
-                  [...task.comments].reverse().map((comment) => (
-                    <div
-                      key={comment.id}
-                      className="p-3 bg-background rounded-lg border shadow-sm"
-                    >
-                      <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {formatDateTime(comment.created_at)}
-                      </p>
-                    </div>
-                  ))
+                  [...task.comments].reverse().map((comment) => {
+                    const isEditing = editingCommentId === comment.id;
+                    const isDeleting = deletingCommentId === comment.id;
+                    const isLongComment = comment.content.length > COMMENT_PREVIEW_LENGTH;
+                    const isExpanded = expandedComments.has(comment.id);
+                    const displayContent = isLongComment && !isExpanded
+                      ? comment.content.slice(0, COMMENT_PREVIEW_LENGTH) + "..."
+                      : comment.content;
+
+                    return (
+                      <div
+                        key={comment.id}
+                        className="p-3 bg-background rounded-lg border shadow-sm group relative"
+                      >
+                        {/* Menú de opciones (visible on hover) */}
+                        {!isEditing && !isDeleting && (
+                          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => startEditComment(comment)}>
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setDeletingCommentId(comment.id)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Eliminar
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        )}
+
+                        {/* Contenido del comentario */}
+                        {isEditing ? (
+                          <div className="space-y-2">
+                            <Textarea
+                              value={editingCommentContent}
+                              onChange={(e) => setEditingCommentContent(e.target.value)}
+                              rows={3}
+                              className="resize-none text-sm"
+                              autoFocus
+                            />
+                            <div className="flex gap-2 justify-end">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={cancelEditComment}
+                              >
+                                <X className="h-4 w-4 mr-1" />
+                                Cancelar
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={saveEditComment}
+                                disabled={!editingCommentContent.trim()}
+                              >
+                                <Check className="h-4 w-4 mr-1" />
+                                Guardar
+                              </Button>
+                            </div>
+                          </div>
+                        ) : isDeleting ? (
+                          <div className="space-y-2">
+                            <p className="text-sm text-destructive font-medium">
+                              ¿Eliminar este comentario?
+                            </p>
+                            <div className="flex gap-2 justify-end">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setDeletingCommentId(null)}
+                              >
+                                Cancelar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => deleteComment(comment.id)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Eliminar
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-sm whitespace-pre-wrap pr-8">{displayContent}</p>
+                            {isLongComment && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-auto p-0 text-xs text-primary hover:text-primary/80"
+                                onClick={() => toggleExpandComment(comment.id)}
+                              >
+                                {isExpanded ? (
+                                  <>
+                                    <ChevronUp className="h-3 w-3 mr-1" />
+                                    Ver menos
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronDown className="h-3 w-3 mr-1" />
+                                    Ver más
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {formatDateTime(comment.created_at)}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-20" />
