@@ -56,8 +56,12 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isPublicRoute) {
-    // Usuario autenticado intentando acceder a rutas de auth
+  // Permitir acceso a reset-password incluso si está autenticado
+  // (necesario porque el enlace de recuperación crea una sesión temporal)
+  const isResetPasswordRoute = request.nextUrl.pathname.startsWith("/auth/reset-password");
+
+  if (user && isPublicRoute && !isResetPasswordRoute) {
+    // Usuario autenticado intentando acceder a rutas de auth (excepto reset-password)
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
