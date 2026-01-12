@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+  const type = requestUrl.searchParams.get("type");
   const origin = requestUrl.origin;
 
   if (code) {
@@ -11,6 +12,11 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
+      // Si es una recuperación de contraseña, redirigir a la página de reset
+      if (type === "recovery") {
+        return NextResponse.redirect(`${origin}/auth/reset-password`);
+      }
+
       // Verificar si el usuario necesita crear un perfil inicial
       const { data: { user } } = await supabase.auth.getUser();
 
