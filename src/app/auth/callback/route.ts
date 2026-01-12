@@ -28,7 +28,7 @@ export async function GET(request: Request) {
             user_id: user.id,
             name: "Principal",
             order: 0,
-          });
+          } as never);
 
           // Crear configuración por defecto
           await supabase.from("user_settings").insert({
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
             theme: "system",
             auto_archive_days: 2,
             columns_order: ["pending", "today", "scheduled", "overdue", "completed", "archived"],
-          });
+          } as never);
         }
       }
 
