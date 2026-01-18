@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
-import { TaskColumns } from "@/components/columns/task-columns";
+import { ViewSwitcher } from "@/components/layout/view-switcher";
 import { DailySummaryModal } from "@/components/daily-summary/daily-summary-modal";
 
 export default async function HomePage() {
@@ -97,7 +97,7 @@ export default async function HomePage() {
       settings={settings}
       categories={categories}
     >
-      <TaskColumns
+      <ViewSwitcher
         tasks={tasks}
         categories={categories}
         currentProfileId={currentProfile?.id}
