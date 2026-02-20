@@ -31,6 +31,13 @@ interface AttachmentListProps {
 }
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+const ALLOWED_EXTENSIONS = new Set([
+  "jpg", "jpeg", "png", "gif", "webp", "svg", "bmp",
+  "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+  "txt", "csv", "rtf", "odt", "ods",
+  "zip", "rar", "7z",
+  "mp3", "wav", "mp4", "webm",
+]);
 
 function getFileIcon(fileType: string) {
   if (fileType.startsWith("image/")) return ImageIcon;
@@ -133,11 +140,16 @@ export function AttachmentList({ task, onUpdate }: AttachmentListProps) {
       return;
     }
 
+    const fileExt = (file.name.split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!fileExt || !ALLOWED_EXTENSIONS.has(fileExt)) {
+      toast.error(`Tipo de archivo no permitido: .${fileExt}`);
+      return;
+    }
+
     setUploading(true);
 
     try {
       // Generate unique file path
-      const fileExt = file.name.split(".").pop();
       const fileName = `${task.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
       // Upload to Supabase Storage
@@ -160,7 +172,7 @@ export function AttachmentList({ task, onUpdate }: AttachmentListProps) {
 
       const { data, error } = await supabase
         .from("task_attachments")
-        .insert(attachmentData)
+        .insert(attachmentData as never)
         .select()
         .single();
 
@@ -419,7 +431,7 @@ export function AttachmentList({ task, onUpdate }: AttachmentListProps) {
             ) : previewUrl && previewAttachment ? (
               previewAttachment.file_type === "application/pdf" ? (
                 <iframe
-                  src={`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(previewUrl)}`}
+                  src={previewUrl}
                   className="w-full h-full border-0"
                   title={previewAttachment.file_name}
                 />

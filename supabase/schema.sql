@@ -445,7 +445,7 @@ BEGIN
     END IF;
     RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY INVOKER;
 
 CREATE TRIGGER log_task_changes_trigger
     AFTER INSERT OR UPDATE ON public.tasks

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
+import { dismissDailySummary } from "@/lib/actions";
 import {
   Dialog,
   DialogContent,
@@ -15,12 +15,10 @@ import type { TaskWithRelations } from "@/types/database";
 
 interface DailySummaryModalProps {
   tasks: TaskWithRelations[];
-  userId: string;
 }
 
-export function DailySummaryModal({ tasks, userId }: DailySummaryModalProps) {
+export function DailySummaryModal({ tasks }: DailySummaryModalProps) {
   const [open, setOpen] = useState(true);
-  const supabase = createClient();
 
   // Calcular estadísticas
   const todayTasks = tasks.filter((t) => {
@@ -42,13 +40,7 @@ export function DailySummaryModal({ tasks, userId }: DailySummaryModalProps) {
 
   const handleClose = async () => {
     setOpen(false);
-
-    // Actualizar last_daily_summary
-    const today = new Date().toISOString().split("T")[0];
-    await supabase
-      .from("user_settings")
-      .update({ last_daily_summary: today })
-      .eq("user_id", userId);
+    await dismissDailySummary();
   };
 
   return (

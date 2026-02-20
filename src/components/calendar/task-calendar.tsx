@@ -194,7 +194,7 @@ export function TaskCalendar({
     if (task.status === "completed") {
       return <CheckCircle className="h-3 w-3 text-green-500" />;
     }
-    if (task.due_date && isPast(new Date(task.due_date)) && task.status !== "completed") {
+    if (task.due_date && isPast(new Date(task.due_date))) {
       return <AlertTriangle className="h-3 w-3 text-red-500" />;
     }
     return <Clock className="h-3 w-3 text-muted-foreground" />;

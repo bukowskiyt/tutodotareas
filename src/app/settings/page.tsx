@@ -4,6 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store";
 import { createClient } from "@/lib/supabase/client";
+import {
+  createProfile as createProfileAction,
+  deleteProfile as deleteProfileAction,
+  createCategory as createCategoryAction,
+  deleteCategory as deleteCategoryAction,
+  updateSettings as updateSettingsAction,
+  changePassword as changePasswordAction,
+} from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -91,23 +99,16 @@ export default function SettingsPage() {
   const handleCreateProfile = async () => {
     if (!newProfileName.trim() || !user) return;
 
-    const newProfile = {
-      user_id: user.id,
+    const result = await createProfileAction({
       name: newProfileName.trim(),
       color: newProfileColor,
       order: profiles.length,
-    };
+    });
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .insert(newProfile)
-      .select()
-      .single();
-
-    if (error) {
-      toast.error("Error al crear el perfil");
+    if (result.error) {
+      toast.error(result.error);
     } else {
-      addProfile(data as Profile);
+      addProfile(result.data as Profile);
       setNewProfileName("");
       toast.success("Perfil creado");
     }
@@ -119,13 +120,10 @@ export default function SettingsPage() {
       return;
     }
 
-    const { error } = await supabase
-      .from("profiles")
-      .delete()
-      .eq("id", profileId);
+    const result = await deleteProfileAction(profileId);
 
-    if (error) {
-      toast.error("Error al eliminar el perfil");
+    if (result.error) {
+      toast.error(result.error);
     } else {
       removeProfile(profileId);
       toast.success("Perfil eliminado");
@@ -135,36 +133,27 @@ export default function SettingsPage() {
   const handleCreateCategory = async () => {
     if (!newCategoryName.trim() || !currentProfile) return;
 
-    const newCat = {
+    const result = await createCategoryAction({
       profile_id: currentProfile.id,
       name: newCategoryName.trim(),
       color: newCategoryColor,
       order: categories.length,
-    };
+    });
 
-    const { data, error } = await supabase
-      .from("categories")
-      .insert(newCat)
-      .select()
-      .single();
-
-    if (error) {
-      toast.error("Error al crear la categoría");
+    if (result.error) {
+      toast.error(result.error);
     } else {
-      addCategory(data as Category);
+      addCategory(result.data as Category);
       setNewCategoryName("");
       toast.success("Categoría creada");
     }
   };
 
   const handleDeleteCategory = async (categoryId: string) => {
-    const { error } = await supabase
-      .from("categories")
-      .delete()
-      .eq("id", categoryId);
+    const result = await deleteCategoryAction(categoryId);
 
-    if (error) {
-      toast.error("Error al eliminar la categoría");
+    if (result.error) {
+      toast.error(result.error);
     } else {
       removeCategory(categoryId);
       toast.success("Categoría eliminada");
@@ -175,20 +164,15 @@ export default function SettingsPage() {
     if (!user) return;
     setSaving(true);
 
-    const updates = {
+    const result = await updateSettingsAction({
       auto_archive_days: autoArchiveDays,
-    };
+    });
 
-    const { error } = await supabase
-      .from("user_settings")
-      .update(updates)
-      .eq("user_id", user.id);
-
-    if (error) {
-      toast.error("Error al guardar la configuración");
+    if (result.error) {
+      toast.error(result.error);
     } else {
       if (settings) {
-        setSettings({ ...settings, ...updates });
+        setSettings({ ...settings, auto_archive_days: autoArchiveDays });
       }
       toast.success("Configuración guardada");
     }
@@ -220,20 +204,23 @@ export default function SettingsPage() {
       return;
     }
 
-    if (newPassword.length < 6) {
-      toast.error("La contraseña debe tener al menos 6 caracteres");
+    if (newPassword.length < 8) {
+      toast.error("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      toast.error("La contraseña debe incluir mayúsculas, minúsculas y números");
       return;
     }
 
     setChangingPassword(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
+      const result = await changePasswordAction({ password: newPassword });
 
-      if (error) {
-        toast.error(error.message);
+      if (result.error) {
+        toast.error(result.error);
       } else {
         toast.success("Contraseña actualizada correctamente");
         setCurrentPassword("");

@@ -26,8 +26,16 @@ import { toast } from "sonner";
 import { Plus, Calendar, Flag, Tag, X, CheckCircle2, Paperclip, Upload, File, Trash2 } from "lucide-react";
 import type { Priority, TaskWithRelations, Task, TaskAttachment } from "@/types/database";
 import { cn } from "@/lib/utils";
+import { createTask as createTaskAction } from "@/lib/actions";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+const ALLOWED_EXTENSIONS = new Set([
+  "jpg", "jpeg", "png", "gif", "webp", "svg", "bmp",
+  "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+  "txt", "csv", "rtf", "odt", "ods",
+  "zip", "rar", "7z",
+  "mp3", "wav", "mp4", "webm",
+]);
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -110,6 +118,11 @@ export function NewTaskButton({ profileId }: NewTaskButtonProps) {
         toast.error(`"${file.name}" excede el límite de 25MB`);
         return false;
       }
+      const ext = (file.name.split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
+        toast.error(`Tipo de archivo no permitido: .${ext}`);
+        return false;
+      }
       return true;
     });
     setPendingFiles((prev) => [...prev, ...validFiles]);
@@ -140,7 +153,7 @@ export function NewTaskButton({ profileId }: NewTaskButtonProps) {
 
     for (const file of pendingFiles) {
       try {
-        const fileExt = file.name.split(".").pop();
+        const fileExt = (file.name.split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "");
         const fileName = `${taskId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -159,7 +172,7 @@ export function NewTaskButton({ profileId }: NewTaskButtonProps) {
 
         const { data, error } = await supabase
           .from("task_attachments")
-          .insert(attachmentData)
+          .insert(attachmentData as never)
           .select()
           .single();
 
@@ -204,20 +217,12 @@ export function NewTaskButton({ profileId }: NewTaskButtonProps) {
       completed_at: null,
     };
 
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert(newTask)
-      .select(`
-        *,
-        category:categories(*),
-        subtasks:tasks(*)
-      `)
-      .single();
+    const result = await createTaskAction(newTask);
 
-    if (error) {
-      toast.error("Error al crear la tarea");
-      console.error(error);
+    if (result.error) {
+      toast.error(result.error);
     } else {
+      const data = result.data as TaskWithRelations;
       // Create subtasks if any
       let createdSubtasks: Task[] = [];
       if (subtasks.length > 0) {
@@ -233,7 +238,7 @@ export function NewTaskButton({ profileId }: NewTaskButtonProps) {
 
         const { data: subtaskData, error: subtaskError } = await supabase
           .from("tasks")
-          .insert(subtaskInserts)
+          .insert(subtaskInserts as never)
           .select();
 
         if (subtaskError) {
@@ -284,7 +289,7 @@ export function NewTaskButton({ profileId }: NewTaskButtonProps) {
 
     setLoading(true);
 
-    const newTask = {
+    const result = await createTaskAction({
       profile_id: profileId,
       title: title.trim(),
       description: null,
@@ -298,22 +303,12 @@ export function NewTaskButton({ profileId }: NewTaskButtonProps) {
       recurrence_pattern: null,
       parent_task_id: null,
       completed_at: null,
-    };
+    });
 
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert(newTask)
-      .select(`
-        *,
-        category:categories(*),
-        subtasks:tasks(*)
-      `)
-      .single();
-
-    if (error) {
-      toast.error("Error al crear la tarea");
+    if (result.error) {
+      toast.error(result.error);
     } else {
-      addTask(data as TaskWithRelations);
+      addTask(result.data as TaskWithRelations);
       toast.success("Tarea creada");
       setTitle("");
     }

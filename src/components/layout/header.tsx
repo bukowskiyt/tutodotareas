@@ -72,8 +72,8 @@ export function Header() {
       // Actualizar en la base de datos
       await supabase
         .from("user_settings")
-        .update({ default_profile_id: profileId })
-        .eq("user_id", user?.id);
+        .update({ default_profile_id: profileId } as never)
+        .eq("user_id", user?.id as string);
       router.refresh();
     }
   };

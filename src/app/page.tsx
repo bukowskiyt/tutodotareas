@@ -105,7 +105,6 @@ export default async function HomePage() {
       {showDailySummary && (
         <DailySummaryModal
           tasks={tasks}
-          userId={user.id}
         />
       )}
     </DashboardLayout>

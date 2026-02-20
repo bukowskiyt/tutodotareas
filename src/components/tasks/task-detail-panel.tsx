@@ -67,10 +67,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import type { TaskWithRelations, Category, Priority } from "@/types/database";
+import type { TaskWithRelations, TaskComment, Category, Priority } from "@/types/database";
 import { formatDateTime } from "@/lib/utils";
 import { SubtaskList } from "./subtask-list";
 import { AttachmentList } from "./attachment-list";
+import {
+  updateTask as updateTaskAction,
+  deleteTask as deleteTaskAction,
+  createComment as createCommentAction,
+  updateComment as updateCommentAction,
+  deleteComment as deleteCommentAction,
+  createCategory as createCategoryAction,
+} from "@/lib/actions";
 
 interface TaskDetailPanelProps {
   task: TaskWithRelations;
@@ -135,28 +143,20 @@ export function TaskDetailPanel({ task, categories }: TaskDetailPanelProps) {
     saveTimeoutRef.current = setTimeout(async () => {
       setSaveStatus("saving");
 
-      const fullUpdates = {
-        ...updates,
-        updated_at: new Date().toISOString(),
-      };
-
-      const updatedTask = { ...task, ...fullUpdates };
+      const updatedTask = { ...task, ...updates, updated_at: new Date().toISOString() };
       updateTask(updatedTask);
 
-      const { error } = await supabase
-        .from("tasks")
-        .update(fullUpdates)
-        .eq("id", task.id);
+      const result = await updateTaskAction({ id: task.id, ...updates });
 
-      if (error) {
-        console.error("Error al guardar:", error);
+      if (result.error) {
+        console.error("Error al guardar:", result.error);
         setSaveStatus("idle");
       } else {
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 2000);
       }
     }, 500);
-  }, [task, updateTask, supabase]);
+  }, [task, updateTask]);
 
   // Limpiar timeout al desmontar
   useEffect(() => {
@@ -175,24 +175,18 @@ export function TaskDetailPanel({ task, categories }: TaskDetailPanelProps) {
 
     setCreatingCategory(true);
 
-    const newCategory = {
+    const result = await createCategoryAction({
       profile_id: task.profile_id,
       name: newCategoryName.trim(),
       color: newCategoryColor,
-    };
+    });
 
-    const { data, error } = await supabase
-      .from("categories")
-      .insert(newCategory)
-      .select()
-      .single();
-
-    if (error) {
-      toast.error("Error al crear la categoría");
-      console.error(error);
+    if (result.error) {
+      toast.error(result.error);
     } else {
-      addCategory(data);
-      setCategoryId(data.id);
+      const newCat = result.data as Category;
+      addCategory(newCat);
+      setCategoryId(newCat.id);
       toast.success("Categoría creada");
       setShowNewCategory(false);
       setNewCategoryName("");
@@ -236,36 +230,15 @@ export function TaskDetailPanel({ task, categories }: TaskDetailPanelProps) {
   };
 
   const handleDelete = async () => {
-    const taskBackup = { ...task };
     removeTask(task.id);
     setSelectedTaskId(null);
 
-    const { error } = await supabase.from("tasks").delete().eq("id", task.id);
+    const result = await deleteTaskAction(task.id);
 
-    if (error) {
+    if (result.error) {
       toast.error("Error al eliminar la tarea");
     } else {
-      toast.success("Tarea eliminada", {
-        action: {
-          label: "Deshacer",
-          onClick: async () => {
-            // Restaurar tarea
-            const { error: restoreError } = await supabase
-              .from("tasks")
-              .insert({
-                ...taskBackup,
-                id: undefined, // Supabase generará nuevo ID
-              })
-              .select()
-              .single();
-
-            if (!restoreError) {
-              // Recargar tareas
-              window.location.reload();
-            }
-          },
-        },
-      });
+      toast.success("Tarea eliminada");
     }
   };
 
@@ -274,23 +247,17 @@ export function TaskDetailPanel({ task, categories }: TaskDetailPanelProps) {
 
     setSendingComment(true);
 
-    const comment = {
+    const result = await createCommentAction({
       task_id: task.id,
       content: newComment.trim(),
-    };
+    });
 
-    const { data, error } = await supabase
-      .from("task_comments")
-      .insert(comment)
-      .select()
-      .single();
-
-    if (error) {
-      toast.error("Error al añadir comentario");
+    if (result.error) {
+      toast.error(result.error);
     } else {
       const updatedTask = {
         ...task,
-        comments: [...(task.comments || []), data],
+        comments: [...(task.comments || []), result.data as TaskComment],
       };
       updateTask(updatedTask);
       setNewComment("");
@@ -314,13 +281,10 @@ export function TaskDetailPanel({ task, categories }: TaskDetailPanelProps) {
   const saveEditComment = async () => {
     if (!editingCommentId || !editingCommentContent.trim()) return;
 
-    const { error } = await supabase
-      .from("task_comments")
-      .update({ content: editingCommentContent.trim() })
-      .eq("id", editingCommentId);
+    const result = await updateCommentAction(editingCommentId, editingCommentContent.trim());
 
-    if (error) {
-      toast.error("Error al editar comentario");
+    if (result.error) {
+      toast.error(result.error);
     } else {
       const updatedComments = task.comments?.map((c) =>
         c.id === editingCommentId ? { ...c, content: editingCommentContent.trim() } : c
@@ -333,13 +297,10 @@ export function TaskDetailPanel({ task, categories }: TaskDetailPanelProps) {
 
   // Función para eliminar comentario
   const deleteComment = async (commentId: string) => {
-    const { error } = await supabase
-      .from("task_comments")
-      .delete()
-      .eq("id", commentId);
+    const result = await deleteCommentAction(commentId);
 
-    if (error) {
-      toast.error("Error al eliminar comentario");
+    if (result.error) {
+      toast.error(result.error);
     } else {
       const updatedComments = task.comments?.filter((c) => c.id !== commentId);
       updateTask({ ...task, comments: updatedComments });

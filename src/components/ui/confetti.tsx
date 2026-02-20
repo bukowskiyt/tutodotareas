@@ -80,7 +80,7 @@ function ConfettiPieceComponent({ piece }: { piece: ConfettiPiece }) {
     vy: piece.velocityY,
   });
 
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number>(0);
 
   useEffect(() => {
     const gravity = 0.15;

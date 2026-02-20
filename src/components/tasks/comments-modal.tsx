@@ -46,6 +46,11 @@ import {
 } from "lucide-react";
 import type { TaskWithRelations, TaskComment } from "@/types/database";
 import { formatDateTime, cn } from "@/lib/utils";
+import {
+  createComment as createCommentAction,
+  updateComment as updateCommentAction,
+  deleteComment as deleteCommentAction,
+} from "@/lib/actions";
 
 interface CommentAttachment {
   id: string;
@@ -68,6 +73,14 @@ interface CommentsModalProps {
 }
 
 const MAX_COLLAPSED_LENGTH = 200;
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const ALLOWED_EXTENSIONS = new Set([
+  "jpg", "jpeg", "png", "gif", "webp", "svg", "bmp",
+  "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+  "txt", "csv", "rtf", "odt", "ods",
+  "zip", "rar", "7z",
+  "mp3", "wav", "mp4", "webm",
+]);
 
 export function CommentsModal({ task, open, onClose }: CommentsModalProps) {
   const { updateTask } = useAppStore();
@@ -89,23 +102,19 @@ export function CommentsModal({ task, open, onClose }: CommentsModalProps) {
     setSending(true);
 
     try {
-      // Crear el comentario
-      const comment = {
+      // Crear el comentario via Server Action
+      const commentResult = await createCommentAction({
         task_id: task.id,
         content: newComment.trim() || "(Archivo adjunto)",
-      };
+      });
 
-      const { data: commentData, error: commentError } = await supabase
-        .from("task_comments")
-        .insert(comment)
-        .select()
-        .single();
-
-      if (commentError) {
-        toast.error("Error al añadir comentario");
+      if (commentResult.error) {
+        toast.error(commentResult.error);
         setSending(false);
         return;
       }
+
+      const commentData = commentResult.data as { id: string; task_id: string; content: string; created_at: string; updated_at: string };
 
       // Subir archivos adjuntos si hay
       const uploadedAttachments: CommentAttachment[] = [];
@@ -113,7 +122,7 @@ export function CommentsModal({ task, open, onClose }: CommentsModalProps) {
         setUploading(true);
         for (const file of attachments) {
           try {
-            const fileExt = file.name.split(".").pop();
+            const fileExt = (file.name.split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "");
             const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
             const filePath = `comment-attachments/${commentData.id}/${fileName}`;
 
@@ -130,7 +139,7 @@ export function CommentsModal({ task, open, onClose }: CommentsModalProps) {
                   file_path: filePath,
                   file_type: file.type,
                   file_size: file.size,
-                })
+                } as never)
                 .select()
                 .single();
 
@@ -172,13 +181,10 @@ export function CommentsModal({ task, open, onClose }: CommentsModalProps) {
   const handleEditComment = async (commentId: string) => {
     if (!editContent.trim()) return;
 
-    const { error } = await supabase
-      .from("task_comments")
-      .update({ content: editContent.trim(), updated_at: new Date().toISOString() })
-      .eq("id", commentId);
+    const result = await updateCommentAction(commentId, editContent.trim());
 
-    if (error) {
-      toast.error("Error al editar comentario");
+    if (result.error) {
+      toast.error(result.error);
       return;
     }
 
@@ -209,13 +215,10 @@ export function CommentsModal({ task, open, onClose }: CommentsModalProps) {
       await supabase.from("comment_attachments").delete().eq("comment_id", commentId);
     }
 
-    const { error } = await supabase
-      .from("task_comments")
-      .delete()
-      .eq("id", commentId);
+    const result = await deleteCommentAction(commentId);
 
-    if (error) {
-      toast.error("Error al eliminar comentario");
+    if (result.error) {
+      toast.error(result.error);
       return;
     }
 
@@ -255,8 +258,13 @@ export function CommentsModal({ task, open, onClose }: CommentsModalProps) {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const validFiles = files.filter((file) => {
-      if (file.size > 25 * 1024 * 1024) {
+      if (file.size > MAX_FILE_SIZE) {
         toast.error(`${file.name} es demasiado grande (máx. 25MB)`);
+        return false;
+      }
+      const ext = (file.name.split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
+        toast.error(`Tipo de archivo no permitido: .${ext}`);
         return false;
       }
       return true;

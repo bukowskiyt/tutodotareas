@@ -35,8 +35,13 @@ export function RegisterForm() {
       return;
     }
 
-    if (password.length < 6) {
-      toast.error("La contraseña debe tener al menos 6 caracteres");
+    if (password.length < 8) {
+      toast.error("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      toast.error("La contraseña debe incluir mayúsculas, minúsculas y números");
       return;
     }
 
@@ -47,7 +52,7 @@ export function RegisterForm() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`,
         },
       });
 
@@ -76,7 +81,7 @@ export function RegisterForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`,
         },
       });
 
@@ -142,10 +147,10 @@ export function RegisterForm() {
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={loading}
-              minLength={6}
+              minLength={8}
             />
             <p className="text-xs text-muted-foreground">
-              Mínimo 6 caracteres
+              Mínimo 8 caracteres con mayúsculas, minúsculas y números
             </p>
           </div>
           <div className="space-y-2">

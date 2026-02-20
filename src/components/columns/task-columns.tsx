@@ -21,8 +21,8 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { TaskCard } from "@/components/tasks/task-card";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { updateTask as updateTaskAction } from "@/lib/actions";
 
 interface TaskColumnsProps {
   tasks: TaskWithRelations[];
@@ -71,8 +71,6 @@ export function TaskColumns({
     task: TaskWithRelations;
     targetStatus: TaskStatus;
   } | null>(null);
-  const supabase = createClient();
-
   const VALID_COLUMNS: TaskStatus[] = ["pending", "today", "scheduled", "overdue", "completed", "archived"];
 
   const sensors = useSensors(
@@ -228,25 +226,22 @@ export function TaskColumns({
     newStatus: TaskStatus,
     newDate: string | null
   ) => {
-    const updatedTask = {
+    const updatedTaskLocal = {
       ...task,
       status: newStatus,
       due_date: newDate,
       completed_at: newStatus === "completed" ? new Date().toISOString() : null,
     };
-    updateTask(updatedTask);
+    updateTask(updatedTaskLocal);
 
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        status: newStatus,
-        due_date: newDate,
-        completed_at: updatedTask.completed_at,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", task.id);
+    const result = await updateTaskAction({
+      id: task.id,
+      status: newStatus,
+      due_date: newDate,
+      completed_at: updatedTaskLocal.completed_at,
+    });
 
-    if (error) {
+    if (result.error) {
       toast.error("Error al mover la tarea");
       updateTask(task);
     } else {

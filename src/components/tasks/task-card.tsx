@@ -29,8 +29,11 @@ import {
   Edit,
   Flag,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import {
+  updateTask as updateTaskAction,
+  deleteTask as deleteTaskAction,
+} from "@/lib/actions";
 
 interface TaskCardProps {
   task: TaskWithRelations;
@@ -55,8 +58,6 @@ export function TaskCard({ task, category, isDragging }: TaskCardProps) {
     setCommentsModalTaskId,
   } = useAppStore();
 
-  const supabase = createClient();
-
   const {
     attributes,
     listeners,
@@ -79,47 +80,40 @@ export function TaskCard({ task, category, isDragging }: TaskCardProps) {
   const attachmentCount = task.attachments?.length || 0;
 
   const handleComplete = async () => {
-    const newStatus = task.status === "completed" ? "pending" : "completed";
+    const newStatus = (task.status === "completed" ? "pending" : "completed") as TaskWithRelations["status"];
     const previousTask = { ...task };
-    const updatedTask = {
+    const updatedTaskLocal = {
       ...task,
       status: newStatus,
       completed_at: newStatus === "completed" ? new Date().toISOString() : null,
     };
 
-    updateTask(updatedTask);
+    updateTask(updatedTaskLocal);
 
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        status: newStatus,
-        completed_at: updatedTask.completed_at,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", task.id);
+    const result = await updateTaskAction({
+      id: task.id,
+      status: newStatus,
+      completed_at: updatedTaskLocal.completed_at,
+    });
 
-    if (error) {
+    if (result.error) {
       toast.error("Error al actualizar la tarea");
       updateTask(task);
     } else {
       toast.success(
         newStatus === "completed"
-          ? "¡Tarea completada!"
+          ? "Tarea completada"
           : "Tarea marcada como pendiente",
         {
           action: {
             label: "Deshacer",
             onClick: async () => {
-              // Restaurar estado anterior
               updateTask(previousTask);
-              await supabase
-                .from("tasks")
-                .update({
-                  status: previousTask.status,
-                  completed_at: previousTask.completed_at,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("id", task.id);
+              await updateTaskAction({
+                id: task.id,
+                status: previousTask.status,
+                completed_at: previousTask.completed_at,
+              });
             },
           },
         }
@@ -130,9 +124,9 @@ export function TaskCard({ task, category, isDragging }: TaskCardProps) {
   const handleDelete = async () => {
     removeTask(task.id);
 
-    const { error } = await supabase.from("tasks").delete().eq("id", task.id);
+    const result = await deleteTaskAction(task.id);
 
-    if (error) {
+    if (result.error) {
       toast.error("Error al eliminar la tarea");
     } else {
       toast.success("Tarea eliminada");
@@ -140,30 +134,24 @@ export function TaskCard({ task, category, isDragging }: TaskCardProps) {
   };
 
   const handlePriorityChange = async (priority: Priority) => {
-    const updatedTask = { ...task, priority };
-    updateTask(updatedTask);
+    const updatedTaskLocal = { ...task, priority };
+    updateTask(updatedTaskLocal);
 
-    const { error } = await supabase
-      .from("tasks")
-      .update({ priority, updated_at: new Date().toISOString() })
-      .eq("id", task.id);
+    const result = await updateTaskAction({ id: task.id, priority });
 
-    if (error) {
+    if (result.error) {
       toast.error("Error al cambiar la prioridad");
       updateTask(task);
     }
   };
 
   const handleCategoryChange = async (categoryId: string | null) => {
-    const updatedTask = { ...task, category_id: categoryId };
-    updateTask(updatedTask);
+    const updatedTaskLocal = { ...task, category_id: categoryId };
+    updateTask(updatedTaskLocal);
 
-    const { error } = await supabase
-      .from("tasks")
-      .update({ category_id: categoryId, updated_at: new Date().toISOString() })
-      .eq("id", task.id);
+    const result = await updateTaskAction({ id: task.id, category_id: categoryId });
 
-    if (error) {
+    if (result.error) {
       toast.error("Error al cambiar la categoría");
       updateTask(task);
     }

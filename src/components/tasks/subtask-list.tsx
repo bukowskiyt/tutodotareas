@@ -10,6 +10,11 @@ import { toast } from "sonner";
 import { Plus, X, GripVertical, Pencil, Check } from "lucide-react";
 import type { Task, TaskWithRelations } from "@/types/database";
 import { cn } from "@/lib/utils";
+import {
+  createTask as createTaskAction,
+  updateTask as updateTaskAction,
+  deleteTask as deleteTaskAction,
+} from "@/lib/actions";
 
 interface SubtaskListProps {
   task: TaskWithRelations;
@@ -32,7 +37,7 @@ export function SubtaskList({ task, onUpdate }: SubtaskListProps) {
 
     setAdding(true);
 
-    const newSubtask = {
+    const result = await createTaskAction({
       profile_id: task.profile_id,
       parent_task_id: task.id,
       title: newSubtaskTitle.trim(),
@@ -40,20 +45,14 @@ export function SubtaskList({ task, onUpdate }: SubtaskListProps) {
       status: "pending" as const,
       order: subtasks.length,
       is_recurring: false,
-    };
+    });
 
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert(newSubtask)
-      .select()
-      .single();
-
-    if (error) {
-      toast.error("Error al crear la subtarea");
+    if (result.error) {
+      toast.error(result.error);
     } else {
       const updatedTask = {
         ...task,
-        subtasks: [...subtasks, data as Task],
+        subtasks: [...subtasks, result.data as Task],
       };
       onUpdate(updatedTask);
       setNewSubtaskTitle("");
@@ -75,18 +74,14 @@ export function SubtaskList({ task, onUpdate }: SubtaskListProps) {
     );
     onUpdate({ ...task, subtasks: updatedSubtasks as Task[] });
 
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        status: newStatus,
-        completed_at: completedAt,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", subtask.id);
+    const result = await updateTaskAction({
+      id: subtask.id,
+      status: newStatus,
+      completed_at: completedAt,
+    });
 
-    if (error) {
+    if (result.error) {
       toast.error("Error al actualizar la subtarea");
-      // Revert
       onUpdate(task);
     }
   };
@@ -108,15 +103,12 @@ export function SubtaskList({ task, onUpdate }: SubtaskListProps) {
     );
     onUpdate({ ...task, subtasks: updatedSubtasks as Task[] });
 
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        title: editingTitle.trim(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", subtaskId);
+    const result = await updateTaskAction({
+      id: subtaskId,
+      title: editingTitle.trim(),
+    });
 
-    if (error) {
+    if (result.error) {
       toast.error("Error al editar la subtarea");
       onUpdate(task);
     }
@@ -130,9 +122,9 @@ export function SubtaskList({ task, onUpdate }: SubtaskListProps) {
     const updatedSubtasks = subtasks.filter((s) => s.id !== subtaskId);
     onUpdate({ ...task, subtasks: updatedSubtasks });
 
-    const { error } = await supabase.from("tasks").delete().eq("id", subtaskId);
+    const result = await deleteTaskAction(subtaskId);
 
-    if (error) {
+    if (result.error) {
       toast.error("Error al eliminar la subtarea");
       onUpdate(task);
     } else {
